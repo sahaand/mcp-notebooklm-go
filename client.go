@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -135,6 +136,10 @@ func (c *Client) doRPC(ctx context.Context, method rpc.RPCMethod, params any, so
 	rawBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("read response body: %w", err)
+	}
+
+	if os.Getenv("NOTEBOOKLM_DEBUG") != "" {
+		fmt.Fprintf(os.Stderr, "[DEBUG] RPC %s status=%d body=%s\n", method, resp.StatusCode, string(rawBody))
 	}
 
 	result, err := rpc.DecodeResponse(string(rawBody), string(method))
