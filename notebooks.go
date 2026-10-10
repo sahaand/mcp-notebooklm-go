@@ -56,7 +56,7 @@ func (n *NotebooksAPI) Create(ctx context.Context, title string) (*Notebook, err
 
 // Get fetches a notebook by ID.
 func (n *NotebooksAPI) Get(ctx context.Context, notebookID string) (*Notebook, error) {
-	params := []any{notebookID, nil, []any{2}, nil, 0}
+	params := getNotebookParams(notebookID)
 	result, err := n.client.RPCCall(ctx, rpc.GetNotebook, params, "/notebook/"+notebookID, false)
 	if err != nil {
 		return nil, fmt.Errorf("get notebook %s: %w", notebookID, err)

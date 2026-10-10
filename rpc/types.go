@@ -23,14 +23,14 @@ const (
 	RemoveRecentlyViewed RPCMethod = "fejl7e"
 
 	// Source operations
-	AddSource           RPCMethod = "izAoDd"
-	AddSourceFile       RPCMethod = "o4cbdc" // Register uploaded file as source
-	DeleteSource        RPCMethod = "tGMBJ"
-	GetSource           RPCMethod = "hizoJc"
-	RefreshSource       RPCMethod = "FLmJqe"
+	AddSource            RPCMethod = "izAoDd"
+	AddSourceFile        RPCMethod = "o4cbdc" // Register uploaded file as source
+	DeleteSource         RPCMethod = "tGMBJ"
+	GetSource            RPCMethod = "hizoJc"
+	RefreshSource        RPCMethod = "FLmJqe"
 	CheckSourceFreshness RPCMethod = "yR9Yof"
-	UpdateSource        RPCMethod = "b7Wfje"
-	DiscoverSources     RPCMethod = "qXyaNe"
+	UpdateSource         RPCMethod = "b7Wfje"
+	DiscoverSources      RPCMethod = "Es3dTe"
 
 	// Summary and query
 	Summarize           RPCMethod = "VfAZjd"
@@ -54,19 +54,19 @@ const (
 	ImportResearch    RPCMethod = "LBwxtb"
 
 	// Note and mind map operations
-	GenerateMindMap    RPCMethod = "yyryJe"
-	CreateNote         RPCMethod = "CYK0Xb"
+	GenerateMindMap     RPCMethod = "yyryJe"
+	CreateNote          RPCMethod = "CYK0Xb"
 	GetNotesAndMindMaps RPCMethod = "cFji9"
-	UpdateNote         RPCMethod = "cYAfTb"
-	DeleteNote         RPCMethod = "AH0mwd"
+	UpdateNote          RPCMethod = "cYAfTb"
+	DeleteNote          RPCMethod = "AH0mwd"
 
 	// Conversation
 	GetLastConversationID RPCMethod = "hPTbtc"
 	GetConversationTurns  RPCMethod = "khqZz"
 
 	// Sharing operations
-	ShareNotebook   RPCMethod = "QDyure"
-	GetShareStatus  RPCMethod = "JFMDGd"
+	ShareNotebook  RPCMethod = "QDyure"
+	GetShareStatus RPCMethod = "JFMDGd"
 
 	// User settings
 	GetUserSettings RPCMethod = "ZwVcOc"
@@ -77,14 +77,14 @@ const (
 type ArtifactTypeCode int
 
 const (
-	ArtifactTypeAudio     ArtifactTypeCode = 1
-	ArtifactTypeReport    ArtifactTypeCode = 2
-	ArtifactTypeVideo     ArtifactTypeCode = 3
-	ArtifactTypeQuiz      ArtifactTypeCode = 4
-	ArtifactTypeMindMap   ArtifactTypeCode = 5
+	ArtifactTypeAudio       ArtifactTypeCode = 1
+	ArtifactTypeReport      ArtifactTypeCode = 2
+	ArtifactTypeVideo       ArtifactTypeCode = 3
+	ArtifactTypeQuiz        ArtifactTypeCode = 4
+	ArtifactTypeMindMap     ArtifactTypeCode = 5
 	ArtifactTypeInfographic ArtifactTypeCode = 7
-	ArtifactTypeSlideDeck ArtifactTypeCode = 8
-	ArtifactTypeDataTable ArtifactTypeCode = 9
+	ArtifactTypeSlideDeck   ArtifactTypeCode = 8
+	ArtifactTypeDataTable   ArtifactTypeCode = 9
 )
 
 // ArtifactStatus represents the processing status of an artifact.
@@ -117,6 +117,7 @@ func ArtifactStatusToStr(status ArtifactStatus) string {
 type SourceStatus int
 
 const (
+	SourceUnknown    SourceStatus = -1 // status block absent or code not recognized
 	SourceProcessing SourceStatus = 1
 	SourceReady      SourceStatus = 2
 	SourceError      SourceStatus = 3
@@ -134,6 +135,8 @@ func SourceStatusToStr(status SourceStatus) string {
 		return "error"
 	case SourcePreparing:
 		return "preparing"
+	case SourceUnknown:
+		return "unknown"
 	default:
 		return "unknown"
 	}
@@ -171,16 +174,16 @@ const (
 type VideoStyle int
 
 const (
-	VideoStyleAutoSelect  VideoStyle = 1
-	VideoStyleCustom      VideoStyle = 2
-	VideoStyleClassic     VideoStyle = 3
-	VideoStyleWhiteboard  VideoStyle = 4
-	VideoStyleKawaii      VideoStyle = 5
-	VideoStyleAnime       VideoStyle = 6
-	VideoStyleWatercolor  VideoStyle = 7
-	VideoStyleRetroPrint  VideoStyle = 8
-	VideoStyleHeritage    VideoStyle = 9
-	VideoStylePaperCraft  VideoStyle = 10
+	VideoStyleAutoSelect VideoStyle = 1
+	VideoStyleCustom     VideoStyle = 2
+	VideoStyleClassic    VideoStyle = 3
+	VideoStyleWhiteboard VideoStyle = 4
+	VideoStyleKawaii     VideoStyle = 5
+	VideoStyleAnime      VideoStyle = 6
+	VideoStyleWatercolor VideoStyle = 7
+	VideoStyleRetroPrint VideoStyle = 8
+	VideoStyleHeritage   VideoStyle = 9
+	VideoStylePaperCraft VideoStyle = 10
 )
 
 // QuizQuantity represents quiz/flashcards quantity options.

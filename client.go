@@ -77,10 +77,19 @@ func (c *Client) RefreshAuth(ctx context.Context) error {
 
 // RPCCall executes a batchexecute RPC call and returns the decoded result.
 func (c *Client) RPCCall(ctx context.Context, method rpc.RPCMethod, params any, sourcePath string, allowNull bool) (any, error) {
-	return c.doRPC(ctx, method, params, sourcePath, allowNull, true)
+	policy := rpc.NullIsError
+	if allowNull {
+		policy = rpc.NullAllowed
+	}
+	return c.doRPC(ctx, method, params, sourcePath, policy, true)
 }
 
-func (c *Client) doRPC(ctx context.Context, method rpc.RPCMethod, params any, sourcePath string, allowNull, retry bool) (any, error) {
+// rpcCallPolicy is RPCCall with explicit control over null-result handling.
+func (c *Client) rpcCallPolicy(ctx context.Context, method rpc.RPCMethod, params any, sourcePath string, policy rpc.NullPolicy) (any, error) {
+	return c.doRPC(ctx, method, params, sourcePath, policy, true)
+}
+
+func (c *Client) doRPC(ctx context.Context, method rpc.RPCMethod, params any, sourcePath string, policy rpc.NullPolicy, retry bool) (any, error) {
 	encoded, err := rpc.EncodeRPCRequest(method, params)
 	if err != nil {
 		return nil, fmt.Errorf("encode RPC request: %w", err)
@@ -119,7 +128,7 @@ func (c *Client) doRPC(ctx context.Context, method rpc.RPCMethod, params any, so
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
 		if retry {
 			if refreshErr := c.RefreshAuth(ctx); refreshErr == nil {
-				return c.doRPC(ctx, method, params, sourcePath, allowNull, false)
+				return c.doRPC(ctx, method, params, sourcePath, policy, false)
 			}
 		}
 		return nil, fmt.Errorf("authentication failed (HTTP %d) — run 'notebooklm login'", resp.StatusCode)
@@ -142,7 +151,7 @@ func (c *Client) doRPC(ctx context.Context, method rpc.RPCMethod, params any, so
 		fmt.Fprintf(os.Stderr, "[DEBUG] RPC %s status=%d body=%s\n", method, resp.StatusCode, string(rawBody))
 	}
 
-	return rpc.DecodeResponse(string(rawBody), string(method), allowNull)
+	return rpc.DecodeResponse(string(rawBody), string(method), policy)
 }
 
 // Download performs an authenticated GET request and returns the response body.

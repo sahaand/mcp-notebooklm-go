@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	"github.com/saeedata/notebooklm-go/rpc"
 	"github.com/spf13/cobra"
 )
 
@@ -15,6 +17,8 @@ var sourceCmd = &cobra.Command{
 func init() {
 	var notebookID string
 	var mimeType string
+	var driveTitle string
+	var discoverMode string
 
 	listCmd := &cobra.Command{
 		Use:   "list",
@@ -65,7 +69,7 @@ func init() {
 				printJSON(src)
 				return nil
 			}
-			fmt.Printf("ID:     %s\nTitle:  %s\nType:   %s\n", src.ID, src.Title, string(src.Kind()))
+			fmt.Printf("ID:     %s\nTitle:  %s\nType:   %s\nStatus: %s\n", src.ID, src.Title, string(src.Kind()), rpc.SourceStatusToStr(src.Status))
 			if src.URL != "" {
 				fmt.Printf("URL:    %s\n", src.URL)
 			}
@@ -144,7 +148,7 @@ func init() {
 	addFileCmd.Flags().StringVarP(&notebookID, "notebook", "n", "", "notebook ID (required)")
 
 	addDriveCmd := &cobra.Command{
-		Use:   "add-drive <drive-url>",
+		Use:   "add-drive <drive-file-id-or-url>",
 		Short: "Add a Google Drive document as a source",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -156,11 +160,7 @@ func init() {
 			if err := requireNotebook(nb); err != nil {
 				return err
 			}
-			mt := mimeType
-			if mt == "" {
-				mt = "application/vnd.google-apps.document"
-			}
-			src, err := c.Sources.AddDrive(context.Background(), nb, args[0], mt)
+			src, err := c.Sources.AddDrive(context.Background(), nb, args[0], driveTitle, mimeType)
 			if err != nil {
 				return err
 			}
@@ -170,6 +170,7 @@ func init() {
 	}
 	addDriveCmd.Flags().StringVarP(&notebookID, "notebook", "n", "", "notebook ID (required)")
 	addDriveCmd.Flags().StringVar(&mimeType, "mime-type", "", "MIME type (default: application/vnd.google-apps.document)")
+	addDriveCmd.Flags().StringVar(&driveTitle, "title", "", "display title (default: the Drive file's title)")
 
 	renameCmd := &cobra.Command{
 		Use:   "rename <source-id> <new-title>",
@@ -256,10 +257,13 @@ func init() {
 				return err
 			}
 			if outputJSON {
-				printJSON(map[string]string{"guide": guide})
+				printJSON(guide)
 				return nil
 			}
-			fmt.Print(guide)
+			fmt.Println(guide.Summary)
+			if len(guide.Keywords) > 0 {
+				fmt.Printf("\nKeywords: %s\n", strings.Join(guide.Keywords, ", "))
+			}
 			return nil
 		},
 	}
@@ -292,9 +296,10 @@ func init() {
 	}
 	checkFreshnessCmd.Flags().StringVarP(&notebookID, "notebook", "n", "", "notebook ID (required)")
 
-	discoverCmd := &cobra.Command{
-		Use:   "discover",
-		Short: "Discover suggested sources for a notebook",
+	getFulltextCmd := &cobra.Command{
+		Use:   "get-fulltext <source-id>",
+		Short: "Print the full indexed text of a source",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := client()
 			if err != nil {
@@ -304,25 +309,60 @@ func init() {
 			if err := requireNotebook(nb); err != nil {
 				return err
 			}
-			urls, err := c.Sources.DiscoverSources(context.Background(), nb)
+			ft, err := c.Sources.GetFulltext(context.Background(), nb, args[0])
 			if err != nil {
 				return err
 			}
 			if outputJSON {
-				printJSON(urls)
+				printJSON(ft)
 				return nil
 			}
-			if len(urls) == 0 {
+			fmt.Println(ft.Content)
+			return nil
+		},
+	}
+	getFulltextCmd.Flags().StringVarP(&notebookID, "notebook", "n", "", "notebook ID (required)")
+
+	discoverCmd := &cobra.Command{
+		Use:   "discover [query]",
+		Short: "Search the web for sources to add to a notebook",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := client()
+			if err != nil {
+				return err
+			}
+			nb := notebookOrCtx(notebookID)
+			if err := requireNotebook(nb); err != nil {
+				return err
+			}
+			query := ""
+			if len(args) == 1 {
+				query = args[0]
+			}
+			res, err := c.Sources.DiscoverSources(context.Background(), nb, query, discoverMode)
+			if err != nil {
+				return err
+			}
+			if outputJSON {
+				printJSON(res)
+				return nil
+			}
+			if res.Summary != "" {
+				fmt.Printf("%s\n\n", res.Summary)
+			}
+			if len(res.Sources) == 0 {
 				fmt.Println("No sources discovered.")
 				return nil
 			}
-			for _, u := range urls {
-				fmt.Println(u)
+			for _, s := range res.Sources {
+				fmt.Printf("%s\t%s\n", s.URL, s.Title)
 			}
 			return nil
 		},
 	}
 	discoverCmd.Flags().StringVarP(&notebookID, "notebook", "n", "", "notebook ID (required)")
+	discoverCmd.Flags().StringVar(&discoverMode, "mode", "default", "default, raw, curious or curious_raw (curious modes ignore the query)")
 
-	sourceCmd.AddCommand(listCmd, getCmd, addURLCmd, addTextCmd, addFileCmd, addDriveCmd, renameCmd, refreshCmd, deleteCmd, getGuideCmd, checkFreshnessCmd, discoverCmd)
+	sourceCmd.AddCommand(listCmd, getCmd, addURLCmd, addTextCmd, addFileCmd, addDriveCmd, renameCmd, refreshCmd, deleteCmd, getGuideCmd, getFulltextCmd, checkFreshnessCmd, discoverCmd)
 }

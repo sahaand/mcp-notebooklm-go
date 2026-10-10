@@ -21,7 +21,7 @@ const trailer = `[["di",42],["af.httprm",41,"-1234567890",5]]`
 
 func TestDecodeResponseResult(t *testing.T) {
 	raw := chunked(`[["wrb.fr","izAoDd","[[[\"src-1\"],\"Title\"]]",null,null,null,"generic"]]`, trailer)
-	got, err := DecodeResponse(raw, "izAoDd", false)
+	got, err := DecodeResponse(raw, "izAoDd", NullIsError)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -36,7 +36,7 @@ func TestDecodeResponseLastNonNullFrameWins(t *testing.T) {
 		`[["wrb.fr","rLM1Ne","[\"final\"]",null,null,null,"generic"]]`,
 		trailer,
 	)
-	got, err := DecodeResponse(raw, "rLM1Ne", false)
+	got, err := DecodeResponse(raw, "rLM1Ne", NullIsError)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -49,7 +49,7 @@ func TestDecodeResponseNullWithStatus(t *testing.T) {
 	// The shape returned when izAoDd gets an outdated payload.
 	raw := chunked(`[["wrb.fr","izAoDd",null,null,null,[3],"generic"]]`, trailer)
 
-	_, err := DecodeResponse(raw, "izAoDd", false)
+	_, err := DecodeResponse(raw, "izAoDd", NullIsError)
 	var rpcErr *RPCError
 	if !errors.As(err, &rpcErr) {
 		t.Fatalf("want *RPCError, got %v", err)
@@ -62,7 +62,7 @@ func TestDecodeResponseNullWithStatus(t *testing.T) {
 	}
 
 	// allowNull callers still get a nil result, matching the reference.
-	got, err := DecodeResponse(raw, "izAoDd", true)
+	got, err := DecodeResponse(raw, "izAoDd", NullAllowed)
 	if err != nil || got != nil {
 		t.Fatalf("allowNull: got (%v, %v), want (nil, nil)", got, err)
 	}
@@ -70,7 +70,7 @@ func TestDecodeResponseNullWithStatus(t *testing.T) {
 
 func TestDecodeResponseNotFoundHint(t *testing.T) {
 	raw := chunked(`[["wrb.fr","rLM1Ne",null,null,null,[5],"generic"]]`, trailer)
-	_, err := DecodeResponse(raw, "rLM1Ne", false)
+	_, err := DecodeResponse(raw, "rLM1Ne", NullIsError)
 	if err == nil || !strings.Contains(err.Error(), "not found") || !strings.Contains(err.Error(), "account") {
 		t.Fatalf("want not-found error with account hint, got %v", err)
 	}
@@ -78,7 +78,7 @@ func TestDecodeResponseNotFoundHint(t *testing.T) {
 
 func TestDecodeResponseServerStatusMessage(t *testing.T) {
 	raw := chunked(`[["wrb.fr","R7cb6c",null,null,null,[9,"  Notebook   has no sources "],"generic"]]`, trailer)
-	_, err := DecodeResponse(raw, "R7cb6c", false)
+	_, err := DecodeResponse(raw, "R7cb6c", NullIsError)
 	if err == nil || !strings.Contains(err.Error(), "(failed precondition): Notebook has no sources") {
 		t.Fatalf("got %v", err)
 	}
@@ -86,7 +86,7 @@ func TestDecodeResponseServerStatusMessage(t *testing.T) {
 
 func TestDecodeResponseNullWithoutStatus(t *testing.T) {
 	raw := chunked(`[["wrb.fr","izAoDd",null,null,null,null,"generic"]]`, trailer)
-	_, err := DecodeResponse(raw, "izAoDd", false)
+	_, err := DecodeResponse(raw, "izAoDd", NullIsError)
 	var rpcErr *RPCError
 	if !errors.As(err, &rpcErr) || rpcErr.GRPCCode != 0 || !strings.Contains(err.Error(), "empty result") {
 		t.Fatalf("got %v", err)
@@ -96,7 +96,7 @@ func TestDecodeResponseNullWithoutStatus(t *testing.T) {
 func TestDecodeResponseUnrecognizedStatusIgnored(t *testing.T) {
 	for _, status := range []string{`[99]`, `[true]`, `["3"]`, `[[3]]`, `[3.5]`} {
 		raw := chunked(`[["wrb.fr","izAoDd",null,null,null,`+status+`,"generic"]]`, trailer)
-		_, err := DecodeResponse(raw, "izAoDd", false)
+		_, err := DecodeResponse(raw, "izAoDd", NullIsError)
 		var rpcErr *RPCError
 		if !errors.As(err, &rpcErr) || rpcErr.GRPCCode != 0 {
 			t.Errorf("status %s: got %v", status, err)
@@ -107,7 +107,7 @@ func TestDecodeResponseUnrecognizedStatusIgnored(t *testing.T) {
 func TestDecodeResponseUserDisplayableError(t *testing.T) {
 	raw := chunked(`[["wrb.fr","R7cb6c",null,null,null,[8,null,[["type.googleapis.com/google.internal.labs.tailwind.orchestration.v1.UserDisplayableError",[null,[[1]]]]]],"generic"]]`, trailer)
 	for _, allowNull := range []bool{false, true} {
-		_, err := DecodeResponse(raw, "R7cb6c", allowNull)
+		_, err := DecodeResponse(raw, "R7cb6c", policyFor(allowNull))
 		var rpcErr *RPCError
 		if !errors.As(err, &rpcErr) || rpcErr.RPCCode != "USER_DISPLAYABLE_ERROR" {
 			t.Fatalf("allowNull=%v: got %v", allowNull, err)
@@ -120,7 +120,7 @@ func TestDecodeResponseUserDisplayableError(t *testing.T) {
 
 func TestDecodeResponseErFrame(t *testing.T) {
 	raw := chunked(`[["er","izAoDd",400]]`, trailer)
-	_, err := DecodeResponse(raw, "izAoDd", true)
+	_, err := DecodeResponse(raw, "izAoDd", NullAllowed)
 	if err == nil || !strings.Contains(err.Error(), "invalid request parameters") {
 		t.Fatalf("got %v", err)
 	}
@@ -129,7 +129,7 @@ func TestDecodeResponseErFrame(t *testing.T) {
 func TestDecodeResponseMethodIDMissing(t *testing.T) {
 	raw := chunked(`[["wrb.fr","other1","[1]",null,null,null,"generic"]]`, trailer)
 	for _, allowNull := range []bool{false, true} {
-		_, err := DecodeResponse(raw, "izAoDd", allowNull)
+		_, err := DecodeResponse(raw, "izAoDd", policyFor(allowNull))
 		if err == nil || !strings.Contains(err.Error(), "method ID may have changed") {
 			t.Errorf("allowNull=%v: got %v", allowNull, err)
 		}
@@ -138,7 +138,7 @@ func TestDecodeResponseMethodIDMissing(t *testing.T) {
 
 func TestDecodeResponseNoRPCData(t *testing.T) {
 	for _, allowNull := range []bool{false, true} {
-		_, err := DecodeResponse(chunked(trailer), "izAoDd", allowNull)
+		_, err := DecodeResponse(chunked(trailer), "izAoDd", policyFor(allowNull))
 		if err == nil || !strings.Contains(err.Error(), "no RPC data") {
 			t.Errorf("allowNull=%v: got %v", allowNull, err)
 		}
@@ -148,8 +148,28 @@ func TestDecodeResponseNoRPCData(t *testing.T) {
 func TestDecodeResponseFlatItemChunk(t *testing.T) {
 	// A chunk can be a single item rather than a list of items.
 	raw := chunked(`["wrb.fr","wXbhsf","[[]]",null,null,null,"generic"]`)
-	got, err := DecodeResponse(raw, "wXbhsf", false)
+	got, err := DecodeResponse(raw, "wXbhsf", NullIsError)
 	if err != nil || fmt.Sprint(got) != "[[]]" {
 		t.Fatalf("got (%v, %v)", got, err)
+	}
+}
+
+func policyFor(allowNull bool) NullPolicy {
+	if allowNull {
+		return NullAllowed
+	}
+	return NullIsError
+}
+
+func TestDecodeResponseNullAllowedUnlessRejected(t *testing.T) {
+	rejected := chunked(`[["wrb.fr","b7Wfje",null,null,null,[3],"generic"]]`, trailer)
+	if _, err := DecodeResponse(rejected, "b7Wfje", NullAllowedUnlessRejected); err == nil || !strings.Contains(err.Error(), "invalid argument") {
+		t.Errorf("rejected null: got %v", err)
+	}
+	for _, status := range []string{`null`, `[0]`, `[99]`} {
+		raw := chunked(`[["wrb.fr","b7Wfje",null,null,null,`+status+`,"generic"]]`, trailer)
+		if got, err := DecodeResponse(raw, "b7Wfje", NullAllowedUnlessRejected); got != nil || err != nil {
+			t.Errorf("status %s: got (%v, %v), want (nil, nil)", status, got, err)
+		}
 	}
 }

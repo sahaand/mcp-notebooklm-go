@@ -185,13 +185,27 @@ func ExtractRPCResult(chunks []any, rpcID string) (any, error) {
 	return result, nil
 }
 
+// NullPolicy controls how DecodeResponse treats a result frame that is present but null.
+type NullPolicy int
+
+const (
+	// NullIsError: a null result is an error naming the server's status, if any.
+	NullIsError NullPolicy = iota
+	// NullAllowed: a null result decodes to nil, even when the server attached
+	// a non-OK status (some RPCs do that on success, e.g. remove-from-recent).
+	NullAllowed
+	// NullAllowedUnlessRejected: a null result decodes to nil unless the server
+	// attached a non-OK status, which is then an error. For RPCs whose success
+	// value is null but which answer a rejection the same way (rename, refresh).
+	NullAllowedUnlessRejected
+)
+
 // DecodeResponse is the full pipeline: strip prefix -> parse chunks -> extract result.
 //
 // A response that does not contain rpcID at all is always an error (the method ID
 // changed, or the server sent a login / anti-bot page instead of RPC data). A frame
-// that is present but null is returned as (nil, nil) when allowNull is set;
-// otherwise it is an error that names the gRPC status the server attached, if any.
-func DecodeResponse(raw, rpcID string, allowNull bool) (any, error) {
+// that is present but null is handled according to policy.
+func DecodeResponse(raw, rpcID string, policy NullPolicy) (any, error) {
 	cleaned := StripAntiXSSI(raw)
 	chunks, err := ParseChunkedResponse(cleaned)
 	if err != nil {
@@ -218,11 +232,13 @@ func DecodeResponse(raw, rpcID string, allowNull bool) (any, error) {
 			MethodID: rpcID,
 		}
 	}
-	if allowNull {
+	code, label, payload, ok := findNullResultStatus(chunks, rpcID)
+	rejected := ok && code != 0
+	if policy == NullAllowed || (policy == NullAllowedUnlessRejected && !rejected) {
 		return nil, nil
 	}
 
-	if code, label, payload, ok := findNullResultStatus(chunks, rpcID); ok && code != 0 {
+	if rejected {
 		msg := "server rejected the request (" + label + ")"
 		if serverMsg := statusMessage(payload); serverMsg != "" {
 			msg += ": " + serverMsg

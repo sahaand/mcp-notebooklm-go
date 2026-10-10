@@ -13,22 +13,56 @@ import (
 type SourceType string
 
 const (
-	SourceTypeGoogleDocs        SourceType = "GOOGLE_DOCS"
-	SourceTypeGoogleSlides      SourceType = "GOOGLE_SLIDES"
-	SourceTypeGoogleSpreadsheet SourceType = "GOOGLE_SPREADSHEET"
-	SourceTypePDF               SourceType = "PDF"
-	SourceTypePastedText        SourceType = "PASTED_TEXT"
-	SourceTypeWebPage           SourceType = "WEB_PAGE"
-	SourceTypeGoogleDriveAudio  SourceType = "GOOGLE_DRIVE_AUDIO"
-	SourceTypeGoogleDriveVideo  SourceType = "GOOGLE_DRIVE_VIDEO"
-	SourceTypeYouTube           SourceType = "YOUTUBE"
-	SourceTypeMarkdown          SourceType = "MARKDOWN"
-	SourceTypeDocx              SourceType = "DOCX"
-	SourceTypeCSV               SourceType = "CSV"
-	SourceTypeImage             SourceType = "IMAGE"
-	SourceTypeMedia             SourceType = "MEDIA"
-	SourceTypeUnknown           SourceType = "UNKNOWN"
+	SourceTypeGoogleDocs         SourceType = "GOOGLE_DOCS"
+	SourceTypeGoogleSlides       SourceType = "GOOGLE_SLIDES"
+	SourceTypeGoogleSpreadsheet  SourceType = "GOOGLE_SPREADSHEET"
+	SourceTypeGoogleDrive        SourceType = "GOOGLE_DRIVE"
+	SourceTypePDF                SourceType = "PDF"
+	SourceTypePastedText         SourceType = "PASTED_TEXT"
+	SourceTypeWebPage            SourceType = "WEB_PAGE"
+	SourceTypeGoogleDriveAudio   SourceType = "GOOGLE_DRIVE_AUDIO"
+	SourceTypeGoogleDriveVideo   SourceType = "GOOGLE_DRIVE_VIDEO"
+	SourceTypeYouTube            SourceType = "YOUTUBE"
+	SourceTypeMarkdown           SourceType = "MARKDOWN"
+	SourceTypeDocx               SourceType = "DOCX"
+	SourceTypePowerPoint         SourceType = "POWERPOINT"
+	SourceTypeCSV                SourceType = "CSV"
+	SourceTypeEPUB               SourceType = "EPUB"
+	SourceTypeExcel              SourceType = "EXCEL"
+	SourceTypeGmail              SourceType = "GMAIL"
+	SourceTypeGeminiChat         SourceType = "GEMINI_CHAT"
+	SourceTypeAIModeChat         SourceType = "AI_MODE_CHAT"
+	SourceTypeExpertIntelligence SourceType = "EXPERT_INTELLIGENCE"
+	SourceTypeImage              SourceType = "IMAGE"
+	SourceTypeMedia              SourceType = "MEDIA"
+	SourceTypeUnknown            SourceType = "UNKNOWN"
 )
+
+// sourceTypeCodes maps the type code at source metadata[4] to a SourceType.
+// Code 14 is overloaded server-side (native Sheet vs Drive-hosted PDF); it is
+// reported as GOOGLE_DRIVE here.
+var sourceTypeCodes = map[int]SourceType{
+	1:  SourceTypeGoogleDocs,
+	2:  SourceTypeGoogleSlides,
+	3:  SourceTypePDF,
+	4:  SourceTypePastedText,
+	5:  SourceTypeWebPage,
+	6:  SourceTypePowerPoint,
+	7:  SourceTypeGoogleSpreadsheet,
+	8:  SourceTypeMarkdown,
+	9:  SourceTypeYouTube,
+	10: SourceTypeMedia,
+	11: SourceTypeDocx,
+	12: SourceTypeExcel,
+	13: SourceTypeImage,
+	14: SourceTypeGoogleDrive,
+	15: SourceTypeGmail,
+	16: SourceTypeCSV,
+	17: SourceTypeEPUB,
+	18: SourceTypeGeminiChat,
+	19: SourceTypeAIModeChat,
+	20: SourceTypeExpertIntelligence,
+}
 
 // ArtifactKind represents the high-level type of an artifact.
 type ArtifactKind string
@@ -119,18 +153,40 @@ type Source struct {
 	Status     rpc.SourceStatus `json:"status"`
 }
 
+// SourceGuide is the AI-generated summary and keywords for a source.
+type SourceGuide struct {
+	Summary  string   `json:"summary"`
+	Keywords []string `json:"keywords"`
+}
+
+// SourceFulltext is the full indexed text NotebookLM holds for a source.
+type SourceFulltext struct {
+	SourceID string `json:"source_id"`
+	Title    string `json:"title"`
+	URL      string `json:"url,omitempty"`
+	TypeCode int    `json:"type_code"`
+	Content  string `json:"content"`
+}
+
+// DiscoveredSource is one web result from a source-discovery search.
+type DiscoveredSource struct {
+	URL   string `json:"url"`
+	Title string `json:"title"`
+}
+
+// DiscoverResult is the outcome of a source-discovery search.
+type DiscoverResult struct {
+	TaskID  string             `json:"task_id"`
+	Summary string             `json:"summary"`
+	Sources []DiscoveredSource `json:"sources"`
+	// Failed is set when the server reported an in-band error (no results,
+	// query too long, every result already in the notebook, ...).
+	Failed bool `json:"failed"`
+}
+
 // Kind returns the SourceType enum for this source.
 func (s *Source) Kind() SourceType {
-	typeMap := map[int]SourceType{
-		1: SourceTypeGoogleDocs,
-		2: SourceTypeWebPage,
-		3: SourceTypePDF,
-		4: SourceTypePastedText,
-		5: SourceTypeYouTube,
-		6: SourceTypeGoogleSlides,
-		7: SourceTypeGoogleSpreadsheet,
-	}
-	if t, ok := typeMap[s.TypeCode]; ok {
+	if t, ok := sourceTypeCodes[s.TypeCode]; ok {
 		return t
 	}
 	return SourceTypeUnknown
