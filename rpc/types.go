@@ -56,6 +56,7 @@ const (
 	StartDeepResearch RPCMethod = "QA9ei"
 	PollResearch      RPCMethod = "e3bVqc"
 	ImportResearch    RPCMethod = "LBwxtb"
+	CancelResearch    RPCMethod = "Zbrupe"
 
 	// Note and mind map operations
 	GenerateMindMap     RPCMethod = "yyryJe"
@@ -84,21 +85,33 @@ const (
 	ArtifactTypeAudio       ArtifactTypeCode = 1
 	ArtifactTypeReport      ArtifactTypeCode = 2
 	ArtifactTypeVideo       ArtifactTypeCode = 3
-	ArtifactTypeQuiz        ArtifactTypeCode = 4
+	ArtifactTypeQuiz        ArtifactTypeCode = 4 // also flashcards and interactive mind maps; see the Artifact*Variant codes
 	ArtifactTypeMindMap     ArtifactTypeCode = 5
+	ArtifactTypeFantasyMap  ArtifactTypeCode = 6
 	ArtifactTypeInfographic ArtifactTypeCode = 7
 	ArtifactTypeSlideDeck   ArtifactTypeCode = 8
 	ArtifactTypeDataTable   ArtifactTypeCode = 9
+	ArtifactTypeFile        ArtifactTypeCode = 10
+)
+
+// Variants of ArtifactTypeQuiz, read from artifact row [9][1][0].
+const (
+	ArtifactFlashcardsVariant         = 1
+	ArtifactQuizVariant               = 2
+	ArtifactInteractiveMindMapVariant = 4
 )
 
 // ArtifactStatus represents the processing status of an artifact.
 type ArtifactStatus int
 
 const (
-	ArtifactProcessing ArtifactStatus = 1
-	ArtifactPending    ArtifactStatus = 2
-	ArtifactCompleted  ArtifactStatus = 3
-	ArtifactFailed     ArtifactStatus = 4
+	ArtifactUnknown       ArtifactStatus = 0
+	ArtifactPending       ArtifactStatus = 1 // row created, generation not started
+	ArtifactProcessing    ArtifactStatus = 2
+	ArtifactCompleted     ArtifactStatus = 3
+	ArtifactFailed        ArtifactStatus = 4
+	ArtifactSuggested     ArtifactStatus = 5 // a suggestion, not a real artifact
+	ArtifactPendingReview ArtifactStatus = 6
 )
 
 // ArtifactStatusToStr converts artifact status code to human-readable string.
@@ -112,6 +125,10 @@ func ArtifactStatusToStr(status ArtifactStatus) string {
 		return "completed"
 	case ArtifactFailed:
 		return "failed"
+	case ArtifactSuggested:
+		return "suggested"
+	case ArtifactPendingReview:
+		return "pending_review"
 	default:
 		return "unknown"
 	}
@@ -172,22 +189,24 @@ const (
 	VideoExplainer VideoFormat = 1
 	VideoBrief     VideoFormat = 2
 	VideoCinematic VideoFormat = 3
+	VideoShort     VideoFormat = 4 // vertical short-form video; fixed style
 )
 
 // VideoStyle represents video visual style options.
 type VideoStyle int
 
 const (
+	// VideoStyleCustom is selected by setting GenerateVideoOptions.StylePrompt.
+	VideoStyleCustom     VideoStyle = 0
 	VideoStyleAutoSelect VideoStyle = 1
-	VideoStyleCustom     VideoStyle = 2
-	VideoStyleClassic    VideoStyle = 3
-	VideoStyleWhiteboard VideoStyle = 4
-	VideoStyleKawaii     VideoStyle = 5
-	VideoStyleAnime      VideoStyle = 6
-	VideoStyleWatercolor VideoStyle = 7
+	VideoStyleClassic    VideoStyle = 2
+	VideoStyleWhiteboard VideoStyle = 3
+	VideoStyleHeritage   VideoStyle = 4
+	VideoStylePaperCraft VideoStyle = 5
+	VideoStyleWatercolor VideoStyle = 6
+	VideoStyleAnime      VideoStyle = 7
 	VideoStyleRetroPrint VideoStyle = 8
-	VideoStyleHeritage   VideoStyle = 9
-	VideoStylePaperCraft VideoStyle = 10
+	VideoStyleKawaii     VideoStyle = 9
 )
 
 // QuizQuantity represents quiz/flashcards quantity options.
@@ -196,7 +215,7 @@ type QuizQuantity int
 const (
 	QuizFewer    QuizQuantity = 1
 	QuizStandard QuizQuantity = 2
-	QuizMore     QuizQuantity = 2 // Alias for standard (API limitation)
+	QuizMore     QuizQuantity = 3
 )
 
 // QuizDifficulty represents quiz/flashcards difficulty options.

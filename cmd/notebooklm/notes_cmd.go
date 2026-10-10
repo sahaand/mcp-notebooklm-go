@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"time"
 
+	notebooklm "github.com/saeedata/notebooklm-go"
 	"github.com/spf13/cobra"
 )
 
@@ -16,7 +16,6 @@ var notesCmd = &cobra.Command{
 func init() {
 	var (
 		notebookID string
-		waitFlag   bool
 		sourceIDs  []string
 		noteTitle  string
 	)
@@ -125,9 +124,10 @@ func init() {
 	}
 	deleteCmd.Flags().StringVarP(&notebookID, "notebook", "n", "", "notebook ID (required)")
 
+	var mindMapInstructions, mindMapLanguage string
 	mindMapCmd := &cobra.Command{
 		Use:   "mind-map",
-		Short: "Generate a mind map from notebook sources",
+		Short: "Generate a mind map from notebook sources and save it as a note",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := client()
 			if err != nil {
@@ -137,30 +137,26 @@ func init() {
 			if err := requireNotebook(nb); err != nil {
 				return err
 			}
-			status, err := c.Notes.GenerateMindMap(context.Background(), nb, sourceIDs)
-			if err != nil {
-				return err
-			}
-			if !waitFlag || status.TaskID == "" {
-				fmt.Printf("Started mind map generation: task=%s\n", status.TaskID)
-				return nil
-			}
-			fmt.Println("Waiting for completion...")
-			completed, err := c.Artifacts.WaitForCompletion(context.Background(), nb, status.TaskID, 10*time.Minute)
+			note, err := c.Notes.GenerateMindMap(context.Background(), nb, notebooklm.GenerateMindMapOptions{
+				SourceIDs:    sourceIDs,
+				Language:     mindMapLanguage,
+				Instructions: mindMapInstructions,
+			})
 			if err != nil {
 				return err
 			}
 			if outputJSON {
-				printJSON(completed)
+				printJSON(note)
 				return nil
 			}
-			fmt.Printf("Status: %s\n", completed.Status)
+			fmt.Printf("Saved mind map as note: %s (%s)\n", note.Title, note.ID)
 			return nil
 		},
 	}
 	mindMapCmd.Flags().StringVarP(&notebookID, "notebook", "n", "", "notebook ID (required)")
-	mindMapCmd.Flags().BoolVarP(&waitFlag, "wait", "w", false, "wait for completion")
-	mindMapCmd.Flags().StringArrayVar(&sourceIDs, "source", nil, "source IDs to include")
+	mindMapCmd.Flags().StringArrayVar(&sourceIDs, "source", nil, "source IDs to include (default: all)")
+	mindMapCmd.Flags().StringVar(&mindMapInstructions, "instructions", "", "what the mind map should focus on")
+	mindMapCmd.Flags().StringVarP(&mindMapLanguage, "language", "l", "en", "output language (BCP 47)")
 
 	notesCmd.AddCommand(listCmd, createCmd, updateCmd, deleteCmd, mindMapCmd)
 }

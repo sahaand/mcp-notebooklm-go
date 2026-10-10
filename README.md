@@ -543,11 +543,11 @@ client := notebooklm.NewClient(auth)
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `client.Notebooks` | `List`, `Create`, `Get`, `Rename`, `Delete`, `GetDescription`, `GetMetadata`, `RemoveFromRecent`                                                                                                        |
 | `client.Sources`   | `List`, `Get`, `AddURL`, `AddText`, `AddFile`, `AddDrive`, `Delete`, `Rename`, `Refresh`, `WaitUntilReady`, `GetGuide`, `GetFulltext`, `CheckFreshness`, `DiscoverSources`                              |
-| `client.Artifacts` | `List`, `Get`, `Delete`, `Rename`, `GenerateAudio`, `GenerateVideo`, `GenerateReport`, `GenerateQuiz`, `GenerateInfographic`, `GenerateSlideDeck`, `GenerateDataTable`, `WaitForCompletion`, `Download` |
+| `client.Artifacts` | `List`, `Get`, `Delete`, `Rename`, `GenerateAudio`, `GenerateVideo`, `GenerateReport`, `GenerateQuiz`, `GenerateInfographic`, `GenerateSlideDeck`, `GenerateDataTable`, `GenerateInteractiveMindMap`, `WaitForCompletion`, `Download`, `GetSuggestedReports`, `ExportArtifact`, `ShareArtifact`, `GetInteractiveHTML`, `ReviseSlide` |
 | `client.Chat`      | `Ask`, `Configure`, `SetMode`, `GetConversationTurns`, `GetLastConversationID`                                                                                                                          |
 | `client.Sharing`   | `GetStatus`, `SetPublic`, `SetViewLevel`, `AddUser`, `UpdateUser`, `RemoveUser`                                                                                                                         |
 | `client.Notes`     | `List`, `Create`, `Update`, `Delete`, `ListMindMaps`, `GenerateMindMap`                                                                                                                                 |
-| `client.Research`  | `StartFast`, `StartDeep`, `Poll`, `Import`, `WaitForCompletion`                                                                                                                                         |
+| `client.Research`  | `Start`, `StartFast`, `StartDeep`, `Poll`, `Import`, `Cancel`, `WaitForCompletion` |
 | `client.Settings`  | `Get`, `SetOutputLanguage`                                                                                                                                                                              |
 
 ***

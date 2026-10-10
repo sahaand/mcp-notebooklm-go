@@ -2,6 +2,7 @@ package notebooklm
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -121,23 +122,66 @@ func (n *NotesAPI) fetchRows(ctx context.Context, notebookID string) ([][]any, e
 	return noteRows(result)
 }
 
-// GenerateMindMap generates a mind map from notebook sources.
-func (n *NotesAPI) GenerateMindMap(ctx context.Context, notebookID string, sourceIDs []string) (*GenerationStatus, error) {
-	sourceParam := buildSourceParam(sourceIDs)
-	params := []any{notebookID, sourceParam}
-	result, err := n.client.RPCCall(ctx, rpc.GenerateMindMap, params, "/notebook/"+notebookID, false)
+// GenerateMindMapOptions configures mind map generation.
+type GenerateMindMapOptions struct {
+	SourceIDs    []string // empty means all sources
+	Language     string   // default "en"
+	Instructions string
+}
+
+// GenerateMindMap generates a mind map from notebook sources and saves it as a
+// note, as the web app does. Generation is synchronous; the returned note's
+// Content is the mind map's JSON tree.
+func (n *NotesAPI) GenerateMindMap(ctx context.Context, notebookID string, opts GenerateMindMapOptions) (*Note, error) {
+	ids, err := n.client.Artifacts.sourceIDsOrAll(ctx, notebookID, opts.SourceIDs)
 	if err != nil {
 		return nil, fmt.Errorf("generate mind map: %w", err)
 	}
-
-	arr, _ := result.([]any)
-	taskID := ""
-	if len(arr) > 0 {
-		if id, ok := arr[0].(string); ok {
-			taskID = id
-		}
+	params := mindMapParams(ids, languageOrDefault(opts.Language), opts.Instructions)
+	result, err := n.client.rpcCallPolicy(ctx, rpc.GenerateMindMap, params, "/notebook/"+notebookID, rpc.NullAllowedUnlessRejected)
+	if err != nil {
+		return nil, fmt.Errorf("generate mind map: %w", err)
 	}
-	return &GenerationStatus{TaskID: taskID, Status: "pending"}, nil
+	content, ok := mindMapJSON(result)
+	if !ok {
+		return nil, fmt.Errorf("generate mind map: no mind map in response")
+	}
+	title := "Mind Map"
+	var tree struct {
+		Name string `json:"name"`
+	}
+	if json.Unmarshal([]byte(content), &tree) == nil && tree.Name != "" {
+		title = tree.Name
+	}
+	return n.Create(ctx, notebookID, title, content)
+}
+
+func mindMapParams(sourceIDs []string, language, instructions string) []any {
+	return []any{
+		rpc.NestIDs(sourceIDs, 2),
+		nil, nil, nil, nil,
+		[]any{"interactive_mindmap", []any{[]any{"[CONTEXT]", instructions}}, language},
+		nil,
+		[]any{2, nil, []any{1}},
+	}
+}
+
+// mindMapJSON returns the mind map JSON at result[0][0] (a string, or a decoded
+// value that is re-encoded).
+func mindMapJSON(result any) (string, bool) {
+	arr, _ := result.([]any)
+	inner, _ := listAt(arr, 0)
+	if len(inner) == 0 {
+		return "", false
+	}
+	if s, ok := inner[0].(string); ok {
+		return s, true
+	}
+	b, err := json.Marshal(inner[0])
+	if err != nil {
+		return "", false
+	}
+	return string(b), true
 }
 
 // noteRows extracts note rows from a GET_NOTES_AND_MIND_MAPS response. Rows come

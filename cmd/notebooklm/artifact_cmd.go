@@ -35,6 +35,7 @@ func init() {
 		quantity     string
 		difficulty   string
 		customPrompt string
+		stylePrompt  string
 		extraInstr   string
 	)
 
@@ -130,7 +131,7 @@ func init() {
 			return err
 		}
 		fmt.Printf("Status: %s\n", completed.Status)
-		if destPath != "" && completed.URL != "" {
+		if destPath != "" {
 			if err := c.Artifacts.Download(context.Background(), notebookID, status.TaskID, destPath); err != nil {
 				return fmt.Errorf("download: %w", err)
 			}
@@ -214,7 +215,10 @@ func init() {
 				opts.Format = rpc.VideoBrief
 			case "cinematic":
 				opts.Format = rpc.VideoCinematic
+			case "short":
+				opts.Format = rpc.VideoShort
 			}
+			opts.StylePrompt = stylePrompt
 			switch styleStr {
 			case "classic":
 				opts.Style = rpc.VideoStyleClassic
@@ -246,7 +250,8 @@ func init() {
 	videoCmd.Flags().BoolVarP(&waitFlag, "wait", "w", false, "wait for completion")
 	videoCmd.Flags().StringVarP(&destPath, "output", "o", "", "download path when --wait is set")
 	videoCmd.Flags().StringArrayVar(&sourceIDs, "source", nil, "source IDs to include")
-	videoCmd.Flags().StringVar(&formatStr, "format", "", "format: explainer, brief, cinematic")
+	videoCmd.Flags().StringVar(&formatStr, "format", "", "format: explainer, brief, cinematic, short")
+	videoCmd.Flags().StringVar(&stylePrompt, "style-prompt", "", "describe a custom visual style (overrides --style)")
 	videoCmd.Flags().StringVar(&styleStr, "style", "", "style: classic, whiteboard, kawaii, anime, watercolor, retro-print, heritage, paper-craft")
 
 	reportCmd := &cobra.Command{
@@ -612,7 +617,7 @@ func init() {
 	}
 	suggestedReportsCmd.Flags().StringVarP(&notebookID, "notebook", "n", "", "notebook ID (required)")
 
-	var exportTypeStr string
+	var exportTypeStr, exportTitle string
 	exportCmd := &cobra.Command{
 		Use:   "export <artifact-id>",
 		Short: "Export an artifact to Docs or Sheets",
@@ -632,12 +637,16 @@ func init() {
 			} else {
 				exportType = rpc.ExportDocs
 			}
-			url, err := c.Artifacts.ExportArtifact(context.Background(), nb, args[0], exportType)
+			url, err := c.Artifacts.ExportArtifact(context.Background(), nb, args[0], exportTitle, exportType)
 			if err != nil {
 				return err
 			}
 			if outputJSON {
 				printJSON(map[string]string{"url": url})
+				return nil
+			}
+			if url == "" {
+				fmt.Println("Export requested; open Google Drive to find the document.")
 				return nil
 			}
 			fmt.Printf("Exported to: %s\n", url)
@@ -646,6 +655,7 @@ func init() {
 	}
 	exportCmd.Flags().StringVarP(&notebookID, "notebook", "n", "", "notebook ID (required)")
 	exportCmd.Flags().StringVar(&exportTypeStr, "type", "docs", "export type: docs, sheets")
+	exportCmd.Flags().StringVar(&exportTitle, "title", "Export", "title of the exported document")
 
 	shareLinkCmd := &cobra.Command{
 		Use:   "share-link <artifact-id>",

@@ -2,9 +2,11 @@ package notebooklm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -165,19 +167,37 @@ func (c *Client) doRPC(ctx context.Context, method rpc.RPCMethod, params any, so
 }
 
 // Download performs an authenticated GET request and returns the response body.
-func (c *Client) Download(ctx context.Context, url string) ([]byte, error) {
+// Cookies are only sent over HTTPS to Google hosts (google.com,
+// googleusercontent.com, googleapis.com), and every redirect hop is checked
+// against the same list. An HTML response is treated as an expired session.
+func (c *Client) Download(ctx context.Context, rawURL string) ([]byte, error) {
+	if !isGoogleMediaURL(rawURL) {
+		return nil, fmt.Errorf("refusing to download from non-Google URL %q", rawURL)
+	}
 	c.mu.Lock()
 	cookieHeader := c.auth.CookieHeader()
 	c.mu.Unlock()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", rawURL, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Cookie", cookieHeader)
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
 
-	resp, err := c.httpClient.Do(req)
+	httpClient := *c.httpClient
+	httpClient.Timeout = 10 * time.Minute
+	httpClient.CheckRedirect = func(r *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return errors.New("too many redirects")
+		}
+		if !isGoogleMediaURL(r.URL.String()) {
+			return fmt.Errorf("refusing redirect to non-Google URL %q", r.URL.Host)
+		}
+		return nil
+	}
+
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -186,5 +206,22 @@ func (c *Client) Download(ctx context.Context, url string) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("download failed: HTTP %d", resp.StatusCode)
 	}
+	if strings.HasPrefix(strings.ToLower(resp.Header.Get("Content-Type")), "text/html") {
+		return nil, errors.New("download returned an HTML page instead of media — the session may have expired; run 'notebooklm login'")
+	}
 	return io.ReadAll(resp.Body)
+}
+
+func isGoogleMediaURL(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Scheme != "https" {
+		return false
+	}
+	host := strings.ToLower(u.Hostname())
+	for _, domain := range []string{"google.com", "googleusercontent.com", "googleapis.com"} {
+		if host == domain || strings.HasSuffix(host, "."+domain) {
+			return true
+		}
+	}
+	return false
 }
