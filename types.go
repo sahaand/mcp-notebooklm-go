@@ -494,6 +494,10 @@ type ShareStatus struct {
 	ViewLevel   rpc.ShareViewLevel `json:"view_level"`
 	SharedUsers []SharedUser       `json:"shared_users,omitempty"`
 	ShareURL    string             `json:"share_url,omitempty"`
+	// MaxShareLimit is the maximum number of individual shares (0 if not reported).
+	MaxShareLimit int `json:"max_share_limit,omitempty"`
+	// PublicSharingAllowed is nil when the server did not say.
+	PublicSharingAllowed *bool `json:"public_sharing_allowed,omitempty"`
 }
 
 // ReportSuggestion represents an AI-suggested report format.

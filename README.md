@@ -518,6 +518,7 @@ import (
 | ---------------------- | -------------------------------------------------------------- |
 | `NOTEBOOKLM_AUTH_JSON` | Playwright storage state JSON (inline, no file needed)         |
 | `NOTEBOOKLM_HOME`      | Override default storage directory (default: `~/.notebooklm/`) |
+| `NOTEBOOKLM_DEBUG`     | Print raw RPC and chat responses to stderr when set            |
 
 ***
 
