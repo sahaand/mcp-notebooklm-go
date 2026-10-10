@@ -142,16 +142,7 @@ func (c *Client) doRPC(ctx context.Context, method rpc.RPCMethod, params any, so
 		fmt.Fprintf(os.Stderr, "[DEBUG] RPC %s status=%d body=%s\n", method, resp.StatusCode, string(rawBody))
 	}
 
-	result, err := rpc.DecodeResponse(string(rawBody), string(method))
-	if err != nil {
-		return nil, err
-	}
-
-	if result == nil && !allowNull {
-		return nil, fmt.Errorf("RPC %s returned null result", method)
-	}
-
-	return result, nil
+	return rpc.DecodeResponse(string(rawBody), string(method), allowNull)
 }
 
 // Download performs an authenticated GET request and returns the response body.
