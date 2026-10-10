@@ -82,10 +82,11 @@ func init() {
 			}
 			if importFlag && len(completed.Sources) > 0 {
 				fmt.Printf("Importing %d sources...\n", len(completed.Sources))
-				if err := c.Research.Import(context.Background(), nb, completed.TaskID, completed.Sources); err != nil {
+				imported, err := c.Research.Import(context.Background(), nb, completed.TaskID, completed.Sources)
+				if err != nil {
 					return fmt.Errorf("import: %w", err)
 				}
-				fmt.Println("Sources imported.")
+				fmt.Printf("Imported %d sources.\n", len(imported))
 			}
 			if outputJSON {
 				printJSON(completed)
@@ -93,7 +94,11 @@ func init() {
 			}
 			fmt.Printf("Status: %s\n", completed.Status)
 			for _, src := range completed.Sources {
-				fmt.Printf("  %s\n", src)
+				if src.URL != "" {
+					fmt.Printf("  %s\t%s\n", src.URL, src.Title)
+				} else {
+					fmt.Printf("  [report] %s\n", src.Title)
+				}
 			}
 			return nil
 		},

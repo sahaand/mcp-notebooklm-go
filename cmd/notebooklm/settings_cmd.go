@@ -29,7 +29,11 @@ func init() {
 				printJSON(settings)
 				return nil
 			}
-			fmt.Printf("Output language: %s\n", settings.OutputLanguage)
+			lang := settings.OutputLanguage
+			if lang == "" {
+				lang = "(account default)"
+			}
+			fmt.Printf("Output language: %s\n", lang)
 			return nil
 		},
 	}

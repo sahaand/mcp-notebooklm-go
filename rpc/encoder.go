@@ -48,3 +48,26 @@ func BuildURLParams(method RPCMethod, sourcePath, sessionID string) url.Values {
 	}
 	return params
 }
+
+// TemplateBlock returns the nested request-context block
+// [2, null, null, [1, null x9, [1]]] that create-notebook, every add-source
+// variant and get-notebook now require (older payloads sent a flat [2] and are
+// rejected with INVALID_ARGUMENT). A fresh value is returned on each call.
+func TemplateBlock() []any {
+	return []any{2, nil, nil, []any{1, nil, nil, nil, nil, nil, nil, nil, nil, nil, []any{1}}}
+}
+
+// NestIDs wraps each ID in depth inner lists and collects them:
+// depth 1 -> [[id1], [id2]], depth 2 -> [[[id1]], [[id2]]].
+// It returns an empty (non-nil) list for no IDs, which encodes as [].
+func NestIDs(ids []string, depth int) []any {
+	out := make([]any, 0, len(ids))
+	for _, id := range ids {
+		var v any = id
+		for i := 0; i < depth; i++ {
+			v = []any{v}
+		}
+		out = append(out, v)
+	}
+	return out
+}

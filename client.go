@@ -2,9 +2,11 @@ package notebooklm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -21,6 +23,7 @@ type Client struct {
 	auth       *AuthTokens
 	httpClient *http.Client
 	mu         sync.Mutex
+	reqid      int // last _reqid sent to the chat endpoint; guarded by mu
 
 	// Sub-clients
 	Notebooks *NotebooksAPI
@@ -61,6 +64,15 @@ func NewClientFromStorage(ctx context.Context, storagePath string) (*Client, err
 	return NewClient(auth), nil
 }
 
+// nextReqID returns the next _reqid for the streamed chat endpoint, which
+// expects a large, increasing value (starting at 100000, step 100000).
+func (c *Client) nextReqID() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.reqid += 100000
+	return c.reqid
+}
+
 // RefreshAuth re-fetches CSRF and session tokens from the NotebookLM homepage.
 func (c *Client) RefreshAuth(ctx context.Context) error {
 	c.mu.Lock()
@@ -77,10 +89,19 @@ func (c *Client) RefreshAuth(ctx context.Context) error {
 
 // RPCCall executes a batchexecute RPC call and returns the decoded result.
 func (c *Client) RPCCall(ctx context.Context, method rpc.RPCMethod, params any, sourcePath string, allowNull bool) (any, error) {
-	return c.doRPC(ctx, method, params, sourcePath, allowNull, true)
+	policy := rpc.NullIsError
+	if allowNull {
+		policy = rpc.NullAllowed
+	}
+	return c.doRPC(ctx, method, params, sourcePath, policy, true)
 }
 
-func (c *Client) doRPC(ctx context.Context, method rpc.RPCMethod, params any, sourcePath string, allowNull, retry bool) (any, error) {
+// rpcCallPolicy is RPCCall with explicit control over null-result handling.
+func (c *Client) rpcCallPolicy(ctx context.Context, method rpc.RPCMethod, params any, sourcePath string, policy rpc.NullPolicy) (any, error) {
+	return c.doRPC(ctx, method, params, sourcePath, policy, true)
+}
+
+func (c *Client) doRPC(ctx context.Context, method rpc.RPCMethod, params any, sourcePath string, policy rpc.NullPolicy, retry bool) (any, error) {
 	encoded, err := rpc.EncodeRPCRequest(method, params)
 	if err != nil {
 		return nil, fmt.Errorf("encode RPC request: %w", err)
@@ -119,7 +140,7 @@ func (c *Client) doRPC(ctx context.Context, method rpc.RPCMethod, params any, so
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
 		if retry {
 			if refreshErr := c.RefreshAuth(ctx); refreshErr == nil {
-				return c.doRPC(ctx, method, params, sourcePath, allowNull, false)
+				return c.doRPC(ctx, method, params, sourcePath, policy, false)
 			}
 		}
 		return nil, fmt.Errorf("authentication failed (HTTP %d) — run 'notebooklm login'", resp.StatusCode)
@@ -142,32 +163,41 @@ func (c *Client) doRPC(ctx context.Context, method rpc.RPCMethod, params any, so
 		fmt.Fprintf(os.Stderr, "[DEBUG] RPC %s status=%d body=%s\n", method, resp.StatusCode, string(rawBody))
 	}
 
-	result, err := rpc.DecodeResponse(string(rawBody), string(method))
-	if err != nil {
-		return nil, err
-	}
-
-	if result == nil && !allowNull {
-		return nil, fmt.Errorf("RPC %s returned null result", method)
-	}
-
-	return result, nil
+	return rpc.DecodeResponse(string(rawBody), string(method), policy)
 }
 
 // Download performs an authenticated GET request and returns the response body.
-func (c *Client) Download(ctx context.Context, url string) ([]byte, error) {
+// Cookies are only sent over HTTPS to Google hosts (google.com,
+// googleusercontent.com, googleapis.com), and every redirect hop is checked
+// against the same list. An HTML response is treated as an expired session.
+func (c *Client) Download(ctx context.Context, rawURL string) ([]byte, error) {
+	if !isGoogleMediaURL(rawURL) {
+		return nil, fmt.Errorf("refusing to download from non-Google URL %q", rawURL)
+	}
 	c.mu.Lock()
 	cookieHeader := c.auth.CookieHeader()
 	c.mu.Unlock()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", rawURL, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Cookie", cookieHeader)
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
 
-	resp, err := c.httpClient.Do(req)
+	httpClient := *c.httpClient
+	httpClient.Timeout = 10 * time.Minute
+	httpClient.CheckRedirect = func(r *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return errors.New("too many redirects")
+		}
+		if !isGoogleMediaURL(r.URL.String()) {
+			return fmt.Errorf("refusing redirect to non-Google URL %q", r.URL.Host)
+		}
+		return nil
+	}
+
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -176,5 +206,22 @@ func (c *Client) Download(ctx context.Context, url string) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("download failed: HTTP %d", resp.StatusCode)
 	}
+	if strings.HasPrefix(strings.ToLower(resp.Header.Get("Content-Type")), "text/html") {
+		return nil, errors.New("download returned an HTML page instead of media — the session may have expired; run 'notebooklm login'")
+	}
 	return io.ReadAll(resp.Body)
+}
+
+func isGoogleMediaURL(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Scheme != "https" {
+		return false
+	}
+	host := strings.ToLower(u.Hostname())
+	for _, domain := range []string{"google.com", "googleusercontent.com", "googleapis.com"} {
+		if host == domain || strings.HasSuffix(host, "."+domain) {
+			return true
+		}
+	}
+	return false
 }

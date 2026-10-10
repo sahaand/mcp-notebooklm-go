@@ -518,6 +518,7 @@ import (
 | ---------------------- | -------------------------------------------------------------- |
 | `NOTEBOOKLM_AUTH_JSON` | Playwright storage state JSON (inline, no file needed)         |
 | `NOTEBOOKLM_HOME`      | Override default storage directory (default: `~/.notebooklm/`) |
+| `NOTEBOOKLM_DEBUG`     | Print raw RPC and chat responses to stderr when set            |
 
 ***
 
@@ -542,12 +543,12 @@ client := notebooklm.NewClient(auth)
 | Client             | Methods                                                                                                                                                                                                 |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `client.Notebooks` | `List`, `Create`, `Get`, `Rename`, `Delete`, `GetDescription`, `GetMetadata`, `RemoveFromRecent`                                                                                                        |
-| `client.Sources`   | `List`, `Get`, `AddURL`, `AddText`, `AddFile`, `AddDrive`, `Delete`, `Rename`, `Refresh`, `WaitUntilReady`                                                                                              |
-| `client.Artifacts` | `List`, `Get`, `Delete`, `Rename`, `GenerateAudio`, `GenerateVideo`, `GenerateReport`, `GenerateQuiz`, `GenerateInfographic`, `GenerateSlideDeck`, `GenerateDataTable`, `WaitForCompletion`, `Download` |
+| `client.Sources`   | `List`, `Get`, `AddURL`, `AddText`, `AddFile`, `AddDrive`, `Delete`, `Rename`, `Refresh`, `WaitUntilReady`, `GetGuide`, `GetFulltext`, `CheckFreshness`, `DiscoverSources`                              |
+| `client.Artifacts` | `List`, `Get`, `Delete`, `Rename`, `GenerateAudio`, `GenerateVideo`, `GenerateReport`, `GenerateQuiz`, `GenerateInfographic`, `GenerateSlideDeck`, `GenerateDataTable`, `GenerateInteractiveMindMap`, `WaitForCompletion`, `Download`, `GetSuggestedReports`, `ExportArtifact`, `ShareArtifact`, `GetInteractiveHTML`, `ReviseSlide` |
 | `client.Chat`      | `Ask`, `Configure`, `SetMode`, `GetConversationTurns`, `GetLastConversationID`                                                                                                                          |
 | `client.Sharing`   | `GetStatus`, `SetPublic`, `SetViewLevel`, `AddUser`, `UpdateUser`, `RemoveUser`                                                                                                                         |
 | `client.Notes`     | `List`, `Create`, `Update`, `Delete`, `ListMindMaps`, `GenerateMindMap`                                                                                                                                 |
-| `client.Research`  | `StartFast`, `StartDeep`, `Poll`, `Import`, `WaitForCompletion`                                                                                                                                         |
+| `client.Research`  | `Start`, `StartFast`, `StartDeep`, `Poll`, `Import`, `Cancel`, `WaitForCompletion` |
 | `client.Settings`  | `Get`, `SetOutputLanguage`                                                                                                                                                                              |
 
 ***

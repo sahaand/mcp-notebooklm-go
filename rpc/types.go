@@ -7,6 +7,10 @@ const (
 	QueryURL        = "https://notebooklm.google.com/_/LabsTailwindUi/data/google.internal.labs.tailwind.orchestration.v1.LabsTailwindOrchestrationService/GenerateFreeFormStreamed"
 	UploadURL       = "https://notebooklm.google.com/upload/_/"
 	HomeURL         = "https://notebooklm.google.com/"
+
+	// DefaultBuildLabel is the web app build sent as "bl" to the chat endpoint.
+	// The server does not currently validate it.
+	DefaultBuildLabel = "boq_labs-tailwind-frontend_20260802.02_p0"
 )
 
 // RPCMethod represents obfuscated method IDs used by the batchexecute API.
@@ -23,14 +27,14 @@ const (
 	RemoveRecentlyViewed RPCMethod = "fejl7e"
 
 	// Source operations
-	AddSource           RPCMethod = "izAoDd"
-	AddSourceFile       RPCMethod = "o4cbdc" // Register uploaded file as source
-	DeleteSource        RPCMethod = "tGMBJ"
-	GetSource           RPCMethod = "hizoJc"
-	RefreshSource       RPCMethod = "FLmJqe"
+	AddSource            RPCMethod = "izAoDd"
+	AddSourceFile        RPCMethod = "o4cbdc" // Register uploaded file as source
+	DeleteSource         RPCMethod = "tGMBJ"
+	GetSource            RPCMethod = "hizoJc"
+	RefreshSource        RPCMethod = "FLmJqe"
 	CheckSourceFreshness RPCMethod = "yR9Yof"
-	UpdateSource        RPCMethod = "b7Wfje"
-	DiscoverSources     RPCMethod = "qXyaNe"
+	UpdateSource         RPCMethod = "b7Wfje"
+	DiscoverSources      RPCMethod = "Es3dTe"
 
 	// Summary and query
 	Summarize           RPCMethod = "VfAZjd"
@@ -52,21 +56,22 @@ const (
 	StartDeepResearch RPCMethod = "QA9ei"
 	PollResearch      RPCMethod = "e3bVqc"
 	ImportResearch    RPCMethod = "LBwxtb"
+	CancelResearch    RPCMethod = "Zbrupe"
 
 	// Note and mind map operations
-	GenerateMindMap    RPCMethod = "yyryJe"
-	CreateNote         RPCMethod = "CYK0Xb"
+	GenerateMindMap     RPCMethod = "yyryJe"
+	CreateNote          RPCMethod = "CYK0Xb"
 	GetNotesAndMindMaps RPCMethod = "cFji9"
-	UpdateNote         RPCMethod = "cYAfTb"
-	DeleteNote         RPCMethod = "AH0mwd"
+	UpdateNote          RPCMethod = "cYAfTb"
+	DeleteNote          RPCMethod = "AH0mwd"
 
 	// Conversation
 	GetLastConversationID RPCMethod = "hPTbtc"
 	GetConversationTurns  RPCMethod = "khqZz"
 
 	// Sharing operations
-	ShareNotebook   RPCMethod = "QDyure"
-	GetShareStatus  RPCMethod = "JFMDGd"
+	ShareNotebook  RPCMethod = "QDyure"
+	GetShareStatus RPCMethod = "JFMDGd"
 
 	// User settings
 	GetUserSettings RPCMethod = "ZwVcOc"
@@ -77,24 +82,36 @@ const (
 type ArtifactTypeCode int
 
 const (
-	ArtifactTypeAudio     ArtifactTypeCode = 1
-	ArtifactTypeReport    ArtifactTypeCode = 2
-	ArtifactTypeVideo     ArtifactTypeCode = 3
-	ArtifactTypeQuiz      ArtifactTypeCode = 4
-	ArtifactTypeMindMap   ArtifactTypeCode = 5
+	ArtifactTypeAudio       ArtifactTypeCode = 1
+	ArtifactTypeReport      ArtifactTypeCode = 2
+	ArtifactTypeVideo       ArtifactTypeCode = 3
+	ArtifactTypeQuiz        ArtifactTypeCode = 4 // also flashcards and interactive mind maps; see the Artifact*Variant codes
+	ArtifactTypeMindMap     ArtifactTypeCode = 5
+	ArtifactTypeFantasyMap  ArtifactTypeCode = 6
 	ArtifactTypeInfographic ArtifactTypeCode = 7
-	ArtifactTypeSlideDeck ArtifactTypeCode = 8
-	ArtifactTypeDataTable ArtifactTypeCode = 9
+	ArtifactTypeSlideDeck   ArtifactTypeCode = 8
+	ArtifactTypeDataTable   ArtifactTypeCode = 9
+	ArtifactTypeFile        ArtifactTypeCode = 10
+)
+
+// Variants of ArtifactTypeQuiz, read from artifact row [9][1][0].
+const (
+	ArtifactFlashcardsVariant         = 1
+	ArtifactQuizVariant               = 2
+	ArtifactInteractiveMindMapVariant = 4
 )
 
 // ArtifactStatus represents the processing status of an artifact.
 type ArtifactStatus int
 
 const (
-	ArtifactProcessing ArtifactStatus = 1
-	ArtifactPending    ArtifactStatus = 2
-	ArtifactCompleted  ArtifactStatus = 3
-	ArtifactFailed     ArtifactStatus = 4
+	ArtifactUnknown       ArtifactStatus = 0
+	ArtifactPending       ArtifactStatus = 1 // row created, generation not started
+	ArtifactProcessing    ArtifactStatus = 2
+	ArtifactCompleted     ArtifactStatus = 3
+	ArtifactFailed        ArtifactStatus = 4
+	ArtifactSuggested     ArtifactStatus = 5 // a suggestion, not a real artifact
+	ArtifactPendingReview ArtifactStatus = 6
 )
 
 // ArtifactStatusToStr converts artifact status code to human-readable string.
@@ -108,6 +125,10 @@ func ArtifactStatusToStr(status ArtifactStatus) string {
 		return "completed"
 	case ArtifactFailed:
 		return "failed"
+	case ArtifactSuggested:
+		return "suggested"
+	case ArtifactPendingReview:
+		return "pending_review"
 	default:
 		return "unknown"
 	}
@@ -117,6 +138,7 @@ func ArtifactStatusToStr(status ArtifactStatus) string {
 type SourceStatus int
 
 const (
+	SourceUnknown    SourceStatus = -1 // status block absent or code not recognized
 	SourceProcessing SourceStatus = 1
 	SourceReady      SourceStatus = 2
 	SourceError      SourceStatus = 3
@@ -134,6 +156,8 @@ func SourceStatusToStr(status SourceStatus) string {
 		return "error"
 	case SourcePreparing:
 		return "preparing"
+	case SourceUnknown:
+		return "unknown"
 	default:
 		return "unknown"
 	}
@@ -165,22 +189,24 @@ const (
 	VideoExplainer VideoFormat = 1
 	VideoBrief     VideoFormat = 2
 	VideoCinematic VideoFormat = 3
+	VideoShort     VideoFormat = 4 // vertical short-form video; fixed style
 )
 
 // VideoStyle represents video visual style options.
 type VideoStyle int
 
 const (
-	VideoStyleAutoSelect  VideoStyle = 1
-	VideoStyleCustom      VideoStyle = 2
-	VideoStyleClassic     VideoStyle = 3
-	VideoStyleWhiteboard  VideoStyle = 4
-	VideoStyleKawaii      VideoStyle = 5
-	VideoStyleAnime       VideoStyle = 6
-	VideoStyleWatercolor  VideoStyle = 7
-	VideoStyleRetroPrint  VideoStyle = 8
-	VideoStyleHeritage    VideoStyle = 9
-	VideoStylePaperCraft  VideoStyle = 10
+	// VideoStyleCustom is selected by setting GenerateVideoOptions.StylePrompt.
+	VideoStyleCustom     VideoStyle = 0
+	VideoStyleAutoSelect VideoStyle = 1
+	VideoStyleClassic    VideoStyle = 2
+	VideoStyleWhiteboard VideoStyle = 3
+	VideoStyleHeritage   VideoStyle = 4
+	VideoStylePaperCraft VideoStyle = 5
+	VideoStyleWatercolor VideoStyle = 6
+	VideoStyleAnime      VideoStyle = 7
+	VideoStyleRetroPrint VideoStyle = 8
+	VideoStyleKawaii     VideoStyle = 9
 )
 
 // QuizQuantity represents quiz/flashcards quantity options.
@@ -189,7 +215,7 @@ type QuizQuantity int
 const (
 	QuizFewer    QuizQuantity = 1
 	QuizStandard QuizQuantity = 2
-	QuizMore     QuizQuantity = 2 // Alias for standard (API limitation)
+	QuizMore     QuizQuantity = 3
 )
 
 // QuizDifficulty represents quiz/flashcards difficulty options.
