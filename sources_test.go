@@ -37,6 +37,8 @@ func TestSourcePayloads(t *testing.T) {
 		got  any
 		want string
 	}{
+		{"create notebook", createNotebookParams("My NB"),
+			`["My NB",null,null,` + tb + `]`},
 		{"get notebook", getNotebookParams("nb"),
 			`["nb",null,` + tb + `,null,0]`},
 		{"add url", addURLParams("nb", "https://example.com/a"),
@@ -199,7 +201,7 @@ func TestParseDiscoverResult(t *testing.T) {
 
 func TestDriveFileID(t *testing.T) {
 	cases := map[string]string{
-		"1AbC_d-9":                                         "1AbC_d-9",
+		"1AbC_d-9": "1AbC_d-9",
 		"https://docs.google.com/document/d/1AbC_d-9/edit": "1AbC_d-9",
 		"https://drive.google.com/file/d/1AbC_d-9/view":    "1AbC_d-9",
 		"https://drive.google.com/open?id=1AbC_d-9":        "1AbC_d-9",

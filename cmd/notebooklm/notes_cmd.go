@@ -18,6 +18,7 @@ func init() {
 		notebookID string
 		waitFlag   bool
 		sourceIDs  []string
+		noteTitle  string
 	)
 
 	listCmd := &cobra.Command{
@@ -92,7 +93,7 @@ func init() {
 			if err := requireNotebook(nb); err != nil {
 				return err
 			}
-			if _, err := c.Notes.Update(context.Background(), nb, args[0], args[1]); err != nil {
+			if _, err := c.Notes.Update(context.Background(), nb, args[0], noteTitle, args[1]); err != nil {
 				return err
 			}
 			fmt.Printf("Updated note: %s\n", args[0])
@@ -100,6 +101,7 @@ func init() {
 		},
 	}
 	updateCmd.Flags().StringVarP(&notebookID, "notebook", "n", "", "notebook ID (required)")
+	updateCmd.Flags().StringVar(&noteTitle, "title", "", "new title (default: keep the current title)")
 
 	deleteCmd := &cobra.Command{
 		Use:   "delete <note-id>",

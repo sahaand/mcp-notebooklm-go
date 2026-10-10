@@ -21,6 +21,7 @@ type Client struct {
 	auth       *AuthTokens
 	httpClient *http.Client
 	mu         sync.Mutex
+	reqid      int // last _reqid sent to the chat endpoint; guarded by mu
 
 	// Sub-clients
 	Notebooks *NotebooksAPI
@@ -59,6 +60,15 @@ func NewClientFromStorage(ctx context.Context, storagePath string) (*Client, err
 		return nil, fmt.Errorf("load auth: %w", err)
 	}
 	return NewClient(auth), nil
+}
+
+// nextReqID returns the next _reqid for the streamed chat endpoint, which
+// expects a large, increasing value (starting at 100000, step 100000).
+func (c *Client) nextReqID() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.reqid += 100000
+	return c.reqid
 }
 
 // RefreshAuth re-fetches CSRF and session tokens from the NotebookLM homepage.

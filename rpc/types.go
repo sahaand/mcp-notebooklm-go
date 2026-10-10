@@ -7,6 +7,10 @@ const (
 	QueryURL        = "https://notebooklm.google.com/_/LabsTailwindUi/data/google.internal.labs.tailwind.orchestration.v1.LabsTailwindOrchestrationService/GenerateFreeFormStreamed"
 	UploadURL       = "https://notebooklm.google.com/upload/_/"
 	HomeURL         = "https://notebooklm.google.com/"
+
+	// DefaultBuildLabel is the web app build sent as "bl" to the chat endpoint.
+	// The server does not currently validate it.
+	DefaultBuildLabel = "boq_labs-tailwind-frontend_20260802.02_p0"
 )
 
 // RPCMethod represents obfuscated method IDs used by the batchexecute API.
